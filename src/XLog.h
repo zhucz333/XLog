@@ -34,10 +34,7 @@ private:
 	LogLevelType m_log_level;
 	std::string m_debug_file;
 	std::string m_warn_file;
-	std::string m_debug_buffer;
-	std::string m_warn_buffer;
 	std::string m_date_now;
-	std::thread::id m_thread_id;
 	int m_file_size;
 	std::shared_ptr<MThread> m_flush_thread;
 };

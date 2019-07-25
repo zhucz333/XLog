@@ -26,12 +26,12 @@ const char* FMTLOG = "%s %s [%u][%s:%zu]";
 static IXLog* g_log = nullptr;
 
 const static std::unordered_map<LogLevelType, std::string> g_log_level_name_map = {
-	{LogLevel::LEVEL_DEBUG,		"DEBUG:"},
-	{LogLevel::LEVEL_INFO,		"INFO:"},
-	{LogLevel::LEVEL_NOTICE,	"NOTICE:"},
+	{LogLevel::LEVEL_DEBUG,		"DEBUG  :"},
+	{LogLevel::LEVEL_INFO,		"INFO   :"},
+	{LogLevel::LEVEL_NOTICE,	"NOTICE :"},
 	{LogLevel::LEVEL_WARNING,	"WARNING:"},
-	{LogLevel::LEVEL_ERROR,		"ERROR:"},
-	{LogLevel::LEVEL_FATAL,		"FATAL:"}
+	{LogLevel::LEVEL_ERROR,		"ERROR  :"},
+	{LogLevel::LEVEL_FATAL,		"FATAL  :"}
 };
 
 #ifdef WIN32
@@ -113,8 +113,6 @@ XLog::XLog(const char *logFilePrefix, const LogLevelType level, int log_file_siz
 	m_fp_warn = fopen(m_warn_file.c_str(), "a");
 	assert(NULL != m_fp_warn);
 
-	m_thread_id = std::this_thread::get_id();
-
 	get_local_time(time_buff, sizeof(time_buff), date_buff, sizeof(date_buff));
 	m_date_now.append(date_buff);
 
@@ -140,31 +138,30 @@ XLog::~XLog()
 		char head[256] = { 0 }; \
 		char time_buff[64] = {0}; \
 		char date_buff[16] = {0}; \
+		std::string log_debug, log_warn; \
 		if (m_log_level > LEVEL) { \
 			return true; \
 		} \
 		get_local_time(time_buff, sizeof(time_buff), date_buff, sizeof(date_buff)); \
-		snprintf(head, sizeof(head), FMTLOG, g_log_level_name_map.find(LEVEL)->second.c_str(), time_buff, m_thread_id, file, line); \
-		if (LEVEL>LogLevel::LEVEL_NOTICE) m_warn_buffer.append(head); \
-		else m_debug_buffer.append(head); \
+		snprintf(head, sizeof(head), FMTLOG, time_buff, g_log_level_name_map.find(LEVEL)->second.c_str(), std::this_thread::get_id(), file, line); \
+		if (LEVEL>LogLevel::LEVEL_NOTICE) log_warn.append(head); \
+		else log_debug.append(head); \
 		va_start(args, fmt); \
 		int size = _vscprintf(fmt, args); \
 		char *log = (char*)calloc(1, size + 1); \
 		vsnprintf(log, size + 1, fmt, args); \
 		va_end(args); \
 		if (LEVEL>=LogLevel::LEVEL_WARNING) { \
-			m_warn_buffer.append(log).append("\n"); \
+			log_warn.append(log).append("\n"); \
 		} \
 		else { \
-			m_debug_buffer.append(log).append("\n"); \
+			log_debug.append(log).append("\n"); \
 		} \
 		free(log); \
 		if (LEVEL < LogLevel::LEVEL_WARNING) { \
-			m_flush_thread->Post(std::bind(&XLog::flush_internal, this, true, m_debug_buffer, std::string(date_buff))); \
-			m_debug_buffer.clear(); \
+			m_flush_thread->Post(std::bind(&XLog::flush_internal, this, true, log_debug, std::string(date_buff))); \
 		} else { \
-			m_flush_thread->Post(std::bind(&XLog::flush_internal, this, false, m_warn_buffer, std::string(date_buff))); \
-			m_warn_buffer.clear(); \
+			m_flush_thread->Post(std::bind(&XLog::flush_internal, this, false, log_warn, std::string(date_buff))); \
 		} \
 		return true; \
 	} \
