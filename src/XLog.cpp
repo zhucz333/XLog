@@ -16,6 +16,8 @@
 #include <windows.h>
 #include <direct.h>
 #else
+#include <sys/stat.h> 
+#include <sys/types.h> 
 #include <pthread.h>
 #endif
 
@@ -35,19 +37,30 @@ const static std::unordered_map<LogLevelType, std::string> g_log_level_name_map 
 };
 
 #ifdef WIN32
-static	DWORD						g_log_tls_key;
+//static	DWORD						g_log_tls_key;
 #define GET_TLS_KEY(key)			(key = TlsAlloc())
 #define FREE_TLS_KEY(key)			(TlsFree(key))
 #define SET_TLS_VALUE(key,val)		(TlsSetValue(key, val))
 #define GET_TLS_VALUE(key,val)		(val = (decltype(val))TlsGetValue(key))
 #define LOCAL_TIME(tm,s)			(localtime_s(tm,s))
+#define MKDIR(s)					(_mkdir(s))
 #else
-static	pthread_key_t				g_log_tls_key;
+//static	pthread_key_t				g_log_tls_key;
 #define GET_TLS_KEY(key)			(pthread_key_create(&key, NULL))
 #define FREE_TLS_KEY(key)			(pthread_setspecific(key, NULL))
 #define SET_TLS_VALUE(key,val)		(pthread_setspecific(key, val))
 #define GET_TLS_VALUE(key,val)		(val = pthread_getspecific(key))
 #define LOCAL_TIME(tm,s)			(localtime_r(s,tm))
+#define MKDIR(s)					(mkdir(s,0777))
+int _vscprintf(const char* fmt, va_list args) 
+{ 
+	int len = 0; 
+	va_list va_args; 
+	va_copy(va_args, args); 
+	len = vsnprintf(NULL, 0, fmt, va_args); 
+	va_end(va_args); 
+	return len; 
+}
 #endif
 
 int get_local_time(char* time_buffer, size_t len1, char* date_buffer, size_t len2)
@@ -102,7 +115,7 @@ XLog::XLog(const char *logFilePrefix, const LogLevelType level, int log_file_siz
 	char const* folder = strrchr(logFilePrefix, '/');
 	if (folder) {
 		std::string path(logFilePrefix, folder - logFilePrefix);
-		_mkdir(path.c_str());
+		MKDIR(path.c_str());
 	}
 	m_debug_file= std::string(logFilePrefix) + ".log";
 	m_warn_file = std::string(logFilePrefix) + ".log.wf";
@@ -166,18 +179,18 @@ XLog::~XLog()
 		return true; \
 	} \
 
-LOG_FUNC(XLog::debug, LogLevel::LEVEL_DEBUG)
-LOG_FUNC(XLog::info, LogLevel::LEVEL_INFO)
-LOG_FUNC(XLog::notice, LogLevel::LEVEL_NOTICE)
-LOG_FUNC(XLog::warning, LogLevel::LEVEL_WARNING)
-LOG_FUNC(XLog::error, LogLevel::LEVEL_ERROR)
+	LOG_FUNC(XLog::debug, LogLevel::LEVEL_DEBUG)
+	LOG_FUNC(XLog::info, LogLevel::LEVEL_INFO)
+	LOG_FUNC(XLog::notice, LogLevel::LEVEL_NOTICE)
+	LOG_FUNC(XLog::warning, LogLevel::LEVEL_WARNING)
+	LOG_FUNC(XLog::error, LogLevel::LEVEL_ERROR)
 LOG_FUNC(XLog::fatal, LogLevel::LEVEL_FATAL)
 
 #undef LOG
 
 void XLog::flush_internal(bool is_debug, std::string buffer, std::string date)
 {
-	struct _stat state = {0};
+	struct stat state = {0};
 
 	if (0 != m_date_now.compare(date)) {
 		fclose(m_fp_debug);
@@ -192,7 +205,7 @@ void XLog::flush_internal(bool is_debug, std::string buffer, std::string date)
 	}
 
 	if (is_debug) {
-		if (0 == _stat(m_debug_file.c_str(), &state) && (state.st_size > m_file_size)) {
+		if (0 == stat(m_debug_file.c_str(), &state) && (state.st_size > m_file_size)) {
 			fclose(m_fp_debug);
 			rename(m_debug_file.c_str(), (m_debug_file + "." + m_date_now + std::to_string(time(NULL))).c_str());
 			m_fp_debug = fopen(m_debug_file.c_str(), "a");
@@ -202,7 +215,7 @@ void XLog::flush_internal(bool is_debug, std::string buffer, std::string date)
 		fflush(m_fp_debug);
 		buffer.clear();
 	} else {
-		if (0 == _stat(m_warn_file.c_str(), &state) && (state.st_size > m_file_size)) {
+		if (0 == stat(m_warn_file.c_str(), &state) && (state.st_size > m_file_size)) {
 			fclose(m_fp_warn);
 			rename(m_warn_file.c_str(), (m_warn_file + "." + m_date_now + std::to_string(time(NULL))).c_str());
 			m_fp_warn = fopen(m_warn_file.c_str(), "a");
