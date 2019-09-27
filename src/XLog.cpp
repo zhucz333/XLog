@@ -9,12 +9,12 @@
 #include <unordered_map>
 #include <mutex>
 #include <functional>
-#include <direct.h>
 #include <chrono>
 
 
 #ifdef WIN32
 #include <windows.h>
+#include <direct.h>
 #else
 #include <pthread.h>
 #endif
